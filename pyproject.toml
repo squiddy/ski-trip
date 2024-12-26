@@ -1,0 +1,15 @@
+[project]
+name = "ski-trip"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pyxel>=2.2.8",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pyxel-reload>=0.2.0",
+    "ruff>=0.8.4",
+]
