@@ -49,3 +49,15 @@ def blt_topleft(
         rotate=rotate,
         scale=scale,
     )
+
+
+def _frames_rendered():
+    last_frame = 0
+    def wrapper():
+        nonlocal last_frame
+        frame_diff, last_frame = pyxel.frame_count - last_frame, pyxel.frame_count
+        return frame_diff
+    return wrapper
+
+
+frames_rendered = _frames_rendered()
