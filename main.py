@@ -2,44 +2,17 @@ import math
 import pyxel
 import random
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from helpers import blt_topleft, Tooltip, text_centered
 
 random.seed(0)
 
 FPS = 60
 COLOR_TRANSPARENT = 11
-DEBUG = 1
 
 pyxel.init(320, 240, fps=FPS)
 pyxel.load("main.pyxres")
-
-
-def blt_topleft(
-    x: int,
-    y: int,
-    img: int | pyxel.Image,
-    u: float,
-    v: float,
-    w: float,
-    h: float,
-    colkey: int | None = None,
-    *,
-    rotate: float | None = None,
-    scale: float | None = None,
-):
-    scale = scale or 1
-    pyxel.blt(
-        x + w / scale,
-        y + h / scale,
-        img,
-        u,
-        v,
-        w,
-        h,
-        colkey,
-        rotate=rotate,
-        scale=scale,
-    )
 
 
 @enum.unique
@@ -55,56 +28,114 @@ class PlayerState(enum.Enum):
     JUMPING = 1
 
 
-@dataclass
-class Tooltip:
-    visible = False
-
-    def update(self):
-        if pyxel.btnp(pyxel.KEY_T):
-            self.visible = not self.visible
-
-    def draw(self):
-        if not self.visible:
-            return
-
-        pyxel.rect(0, 0, 30, 6, 0)
-        pyxel.text(0, 0, f"{pyxel.mouse_x} {pyxel.mouse_y}", 7)
-        pyxel.circ(pyxel.mouse_x, pyxel.mouse_y, 2, 7)
-
-
 class TitleScene:
-    def update(self):
-        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-            if 120 < pyxel.mouse_x < 200 and 192 < pyxel.mouse_y < 218:
-                game.start_run()
+    @dataclass
+    class Snowflake:
+        x: int
+        y: int
+        speed_x: int
+        speed_y: int
+
+    def __init__(self):
+        self.flakes = []
+        for _ in range(10):
+            self.flakes.append(
+                self.Snowflake(
+                    pyxel.rndi(0, pyxel.width),
+                    pyxel.rndi(0, pyxel.height),
+                    pyxel.rndi(1, 2),
+                    pyxel.rndi(1, 2),
+                )
+            )
+
+    def update(self, frame_diff):
+        if pyxel.btnp(pyxel.KEY_S):
+            game.start_run()
+
+        for flake in self.flakes:
+            flake.x += flake.speed_x
+            flake.y += flake.speed_y
+            if flake.y > pyxel.height:
+                flake.y = -20
+            if flake.x > pyxel.width:
+                flake.x = -20
 
     def draw(self):
-        pyxel.mouse(True)
         pyxel.cls(4)
         pyxel.blt(280, 170, 0, *Sprite.TREE_GREEN.value, COLOR_TRANSPARENT, scale=12)
         pyxel.blt(50, 140, 0, *Sprite.SNOWMAN.value, COLOR_TRANSPARENT, scale=8)
-        pyxel.blt(140, 40, 0, 0, 32, 32, 16, COLOR_TRANSPARENT, scale=6)
-        pyxel.blt(150, 210, 0, 32, 32, 24, 16, COLOR_TRANSPARENT, scale=4)
+        pyxel.blt(140, 40, 0, *Sprite.LOGO.value, COLOR_TRANSPARENT, scale=6)
+        text_centered(pyxel.width / 2, 180, "Press S to start", 0)
+
+        for flake in self.flakes:
+            pyxel.blt(
+                flake.x,
+                flake.y,
+                0,
+                *Sprite.SNOWFLAKE.value,
+                COLOR_TRANSPARENT,
+                scale=flake.speed_y,
+            )
 
 
 class PlayingScene:
-    def update(self):
-        pass
+    def __init__(self) -> None:
+        self.player = Player()
+        self.objects: list[tuple[int, int, Sprite]] = []
+        for _ in range(100):
+            sprite = random.choice(
+                [Sprite.TREE_GREEN, Sprite.TREE_HALF, Sprite.TREE_WHITE]
+            )
+            self.objects.append(
+                (
+                    random.randint(0, pyxel.width - 16),
+                    random.randint(100, pyxel.height * 10),
+                    sprite,
+                )
+            )
+
+        for _ in range(30):
+            self.objects.append(
+                (
+                    random.randint(0, pyxel.width - 16),
+                    random.randint(100, pyxel.height * 10),
+                    random.choice([Sprite.ROCK_SMALL, Sprite.ROCK_WIDE]),
+                )
+            )
+
+    def update(self, frame_diff):
+        self.player.update(frame_diff)
+        check_collisions(self.player, self.objects)
 
     def draw(self):
         pyxel.cls(1)
-        pyxel.camera(0, player.y - 40)
+        pyxel.camera(0, self.player.y - 40)
 
         draw_snowtrack(100, 30, 600, 7)
         draw_snowtrack(240, 200, 800, 20)
 
-        for tx, ty, sprite in objects:
+        for tx, ty, sprite in self.objects:
             blt_topleft(tx, ty, 0, *sprite.value, COLOR_TRANSPARENT, scale=2)
 
-        player.draw()
+        self.player.draw()
 
         pyxel.camera()
-        pyxel.text(5, 5, f"{player.y} meters", 7)
+        pyxel.text(5, 5, f"{self.player.y} meters", 7)
+
+
+class GameOverScene:
+    def update(self, frame_diff):
+        if pyxel.btnp(pyxel.KEY_R):
+            game.start_run()
+
+    def draw(self):
+        pyxel.cls(5)
+
+        blt_topleft(
+            150, 40, 0, *Sprite.PLAYER_CRASHED.value, COLOR_TRANSPARENT, scale=12
+        )
+        text_centered(pyxel.width / 2, 140, "Game over", 0)
+        text_centered(pyxel.width / 2, 160, "Press R to restart", 1)
 
 
 @dataclass
@@ -113,8 +144,8 @@ class Game:
     class State(enum.Enum):
         TITLE = 0
         PLAYING = 1
-        PLAYING_CRASH = 2
-        PAUSED = 3
+        PAUSED = 2
+        GAME_OVER = 3
 
     state: State = State.TITLE
     scene = TitleScene()
@@ -123,22 +154,9 @@ class Game:
         self.state = self.State.PLAYING
         self.scene = PlayingScene()
 
-    def toggle_pause(self):
-        self.state = (
-            self.State.PAUSED
-            if self.state == self.State.PLAYING
-            else self.State.PLAYING
-        )
-
-    def transition_to_crash(self):
-        self.state = self.State.PLAYING_CRASH
-
-    def transition_to_playing(self):
-        self.state = self.State.PLAYING
-
-    @property
-    def is_paused(self):
-        return self.state == self.State.PAUSED
+    def game_over(self):
+        self.state = self.State.GAME_OVER
+        self.scene = GameOverScene()
 
 
 @enum.unique
@@ -159,6 +177,8 @@ class Sprite(enum.Enum):
     SNOWBALL_2 = 24, 64, 8, 8
     SNOWBALL_3 = 16, 72, 8, 8
     SNOWBALL_4 = 24, 72, 8, 8
+    LOGO = 0, 32, 32, 16
+    SNOWFLAKE = 32, 32, 9, 11
 
 
 class BoundingBox(enum.Enum):
@@ -177,11 +197,9 @@ class Player:
     direction: Direction = Direction.DOWN
     state: PlayerState = PlayerState.MOVING
     anim_frames_remaining: int = 0
+    track: list[tuple[int, int]] = field(default_factory=list)
 
     def update(self, frame_diff: int):
-        if game.state == game.State.PLAYING_CRASH:
-            return
-
         self.anim_frames_remaining -= frame_diff
 
         if pyxel.btnp(pyxel.KEY_SPACE):
@@ -212,10 +230,15 @@ class Player:
         if game.state == game.State.PLAYING:
             self.y += 1
 
+            if len(self.track) > 100:
+                self.track.pop(0)
+            self.track.append((self.x, self.y))
+
     def draw(self):
-        if game.state == game.State.PLAYING_CRASH:
-            sprite = Sprite.PLAYER_CRASHED
-        elif self.state == PlayerState.JUMPING:
+        for x, y in self.track:
+            pyxel.pset(x + 6, y, 0)
+
+        if self.state == PlayerState.JUMPING:
             sprite = Sprite.PLAYER_JUMPING
         else:
             sprite = {
@@ -227,36 +250,8 @@ class Player:
         width, height = sprite.value[2:]
         blt_topleft(self.x, self.y, 0, *sprite.value, COLOR_TRANSPARENT, scale=2)
 
-    def reset(self):
-        self.x = pyxel.ceil(pyxel.width / 2)
-        self.y = 0
-        self.direction = Direction.DOWN
-        self.state = PlayerState.MOVING
-
-
-objects: list[tuple[int, int, Sprite]] = []
-for _ in range(100):
-    sprite = random.choice([Sprite.TREE_GREEN, Sprite.TREE_HALF, Sprite.TREE_WHITE])
-    objects.append(
-        (
-            random.randint(0, pyxel.width - 16),
-            random.randint(0, pyxel.height * 10),
-            sprite,
-        )
-    )
-
-for _ in range(30):
-    objects.append(
-        (
-            random.randint(0, pyxel.width - 16),
-            random.randint(0, pyxel.height * 10),
-            random.choice([Sprite.ROCK_SMALL, Sprite.ROCK_WIDE]),
-        )
-    )
 
 game = Game()
-title_scene = TitleScene()
-player = Player()
 tooltip = Tooltip()
 
 
@@ -279,7 +274,7 @@ def two_sprites_collide(x1, y1, w1, h1, x2, y2, w2, h2):
     return x1 < x2 + w2 and x1 + w1 > x2 and y1 < y2 + h2 and y1 + h1 > y2
 
 
-def check_collisions():
+def check_collisions(player, objects):
     global game_state
     for x, y, sprite in objects:
         w, h = sprite.value[2:]
@@ -292,38 +287,10 @@ def check_collisions():
             ) and player.state == PlayerState.JUMPING:
                 continue
 
-            game.transition_to_crash()
+            game.game_over()
 
 
 last_frame = pyxel.frame_count
-
-
-def update():
-    global last_frame, game_state
-
-    frame_diff, last_frame = pyxel.frame_count - last_frame, pyxel.frame_count
-
-    tooltip.update()
-
-    if game.state == Game.State.TITLE:
-        title_scene.update()
-        return
-
-    if pyxel.btnp(pyxel.KEY_R):
-        game.transition_to_playing()
-        player.reset()
-
-    if pyxel.btnp(pyxel.KEY_P):
-        game.toggle_pause()
-
-    if game.is_paused:
-        return
-
-    player.update(frame_diff)
-    check_collisions()
-
-    if player.y > pyxel.height * 10:
-        player.y = 0
 
 
 def draw_snowtrack(x, y, length, frequency):
@@ -332,6 +299,15 @@ def draw_snowtrack(x, y, length, frequency):
         x0 = math.sin(y) * amplitude
         x1 = math.sin(y + frequency) * amplitude
         pyxel.line(x0 + x, y, x1 + x, y + frequency, 0)
+
+
+def update():
+    global last_frame, game_state
+
+    frame_diff, last_frame = pyxel.frame_count - last_frame, pyxel.frame_count
+
+    tooltip.update()
+    game.scene.update(frame_diff)
 
 
 def draw():
