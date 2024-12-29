@@ -1,9 +1,8 @@
-import math
 import pyxel
 import enum
 from dataclasses import dataclass, field
 
-from helpers import blt_topleft, Tooltip, text_centered, frames_rendered
+from pyxel_utils import blt_topleft, text_centered, cursor_draw, cursor_update
 
 FPS = 60
 COLOR_TRANSPARENT = 11
@@ -78,7 +77,7 @@ class TitleScene:
 
 class PlayingScene:
     def __init__(self) -> None:
-        random_choice = lambda l: l[pyxel.rndi(0, len(l)-1)]
+        random_choice = lambda l: l[pyxel.rndi(0, len(l) - 1)]
 
         self.player = Player()
         self.objects: list[tuple[int, int, Sprite]] = []
@@ -105,7 +104,12 @@ class PlayingScene:
 
     def update(self):
         self.player.update()
-        if check_collisions(self.player, self.objects):
+        obj = get_collision(self.player, self.objects)
+        if (
+            obj is Sprite.ROCK_SMALL or obj is Sprite.ROCK_WIDE
+        ) and self.player.state == PlayerState.JUMPING:
+            return
+        elif obj:
             game.game_over()
 
     def draw(self):
@@ -133,7 +137,7 @@ class GameOverScene:
         pyxel.cls(5)
 
         blt_topleft(
-            150, 40, 0, *Sprite.PLAYER_CRASHED.value, COLOR_TRANSPARENT, scale=12
+            110, 20, 0, *Sprite.PLAYER_CRASHED.value, COLOR_TRANSPARENT, scale=12
         )
         text_centered(pyxel.width / 2, 140, "Game over", 0)
         text_centered(pyxel.width / 2, 160, "Press R to restart", 1)
@@ -147,10 +151,8 @@ class GameWonScene:
     def draw(self):
         pyxel.cls(9)
 
-        pyxel.rect(0, 215, pyxel.width, 50, 0)
-        blt_topleft(
-            150, 140, 0, *Sprite.WON.value, COLOR_TRANSPARENT, scale=12
-        )
+        pyxel.rect(0, 216, pyxel.width, 50, 0)
+        blt_topleft(60, 60, 0, *Sprite.WON.value, COLOR_TRANSPARENT, scale=12)
         text_centered(pyxel.width / 2, 20, "Game won", 0)
         text_centered(pyxel.width / 2, 40, "Press R to restart", 1)
 
@@ -222,7 +224,7 @@ class Player:
     track: list[tuple[int, int]] = field(default_factory=list)
 
     def update(self):
-        self.anim_frames_remaining -= frames_rendered()
+        self.anim_frames_remaining -= 1
 
         if pyxel.btnp(pyxel.KEY_SPACE):
             if self.state == PlayerState.MOVING and self.direction == Direction.DOWN:
@@ -256,7 +258,7 @@ class Player:
                 self.track.pop(0)
             self.track.append((self.x, self.y))
 
-        if self.y > 1200:
+        if self.y > 1000:
             game.game_won()
 
     def get_speed(self):
@@ -283,7 +285,6 @@ class Player:
 
 
 game = Game()
-tooltip = Tooltip()
 
 
 def two_sprites_collide(x1, y1, w1, h1, x2, y2, w2, h2):
@@ -305,21 +306,14 @@ def two_sprites_collide(x1, y1, w1, h1, x2, y2, w2, h2):
     return x1 < x2 + w2 and x1 + w1 > x2 and y1 < y2 + h2 and y1 + h1 > y2
 
 
-def check_collisions(player: Player, objects) -> bool:
+def get_collision(player: Player, objects) -> Sprite | None:
     for x, y, sprite in objects:
         w, h = sprite.value[2:]
         bx, by, bw, bh = BoundingBox[sprite.name].value
         if two_sprites_collide(
             player.x, player.y, 8 * 2, 8 * 2, x + bx * 2, y + by * 2, bw * 2, bh * 2
         ):
-            if (
-                sprite is Sprite.ROCK_SMALL or sprite is Sprite.ROCK_WIDE
-            ) and player.state == PlayerState.JUMPING:
-                return False
-
-            return True
-
-    return False
+            return sprite
 
 
 def draw_snowtrack(x: int, y: int, length: int, frequency: int):
@@ -331,13 +325,13 @@ def draw_snowtrack(x: int, y: int, length: int, frequency: int):
 
 
 def update():
-    tooltip.update()
+    cursor_update()
     game.scene.update()
 
 
 def draw():
     game.scene.draw()
-    tooltip.draw()
+    cursor_draw()
 
 
 pyxel.run(update, draw)
