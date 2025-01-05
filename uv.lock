@@ -53,16 +53,11 @@ wheels = [
 
 [[package]]
 name = "pyxel-utils"
-version = "0.1.0"
-source = { directory = "../pyxel-utils" }
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pyxel", specifier = "==2.2.10" },
-    { name = "pyxel-reload", specifier = ">=0.2.0" },
-    { name = "ruff", specifier = ">=0.8.4" },
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/fb/087a4cd1002fc6ca458b5e9d0201e1cb44f8e3eed582c75186e00a48aa08/pyxel_utils-0.1.2.tar.gz", hash = "sha256:39f934640c8690ac4a8c9dc8eda0e69c0d1625cb1047a0a592da5b709933c2bb", size = 13700 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4a/1d/cb3ab58242d66dc20892476b984eea5cbceb9ff5095ff45d13cdac10cc32/pyxel_utils-0.1.2-py3-none-any.whl", hash = "sha256:4d2df77c7247bb37abbdfb27675c91f0e15d2b033f8005a323511baf0d02253d", size = 4186 },
 ]
 
 [[package]]
@@ -108,7 +103,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "pyxel", specifier = ">=2.2.8" },
-    { name = "pyxel-utils", directory = "../pyxel-utils" },
+    { name = "pyxel-utils", specifier = ">=0.1.2" },
 ]
 
 [package.metadata.requires-dev]

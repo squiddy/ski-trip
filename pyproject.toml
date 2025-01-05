@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "pyxel-utils",
+    "pyxel-utils>=0.1.2",
     "pyxel>=2.2.8",
 ]
 
@@ -16,4 +16,3 @@ dev-dependencies = [
 ]
 
 [tool.uv.sources]
-pyxel-utils = { path = "../pyxel-utils" }
